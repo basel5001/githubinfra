@@ -1,0 +1,56 @@
+name: Linting
+on:
+  workflow_call:
+    inputs:
+      linter:
+        description: Linter to run (super-linter, ruff, eslint, golangci, swiftlint)
+        required: true
+        type: string
+      config-file:
+        description: Path to linter config file
+        required: false
+        type: string
+        default: ""
+      extra-args:
+        description: Extra arguments for the linter
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: GitHub Super-Linter
+        if: inputs.linter == 'super-linter'
+        uses: super-linter/super-linter@v7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          LINTER_RULES_PATH: ${{ inputs.config-file || '/' }}
+
+      - name: Ruff (Python)
+        if: inputs.linter == 'ruff'
+        uses: chartboost/ruff-action@v1
+        with:
+          args: ${{ inputs.extra-args || 'check' }}
+
+      - name: ESLint
+        if: inputs.linter == 'eslint'
+        run: |
+          npx eslint ${{ inputs.extra-args || '.' }}
+        shell: bash
+
+      - name: golangci-lint
+        if: inputs.linter == 'golangci'
+        uses: golangci/golangci-lint-action@v6
+        with:
+          args: ${{ inputs.extra-args || '--timeout=5m' }}
+
+      - name: SwiftLint
+        if: inputs.linter == 'swiftlint'
+        uses: norio-nomura/action-swiftlint@3.2.1
+        with:
+          args: ${{ inputs.extra-args || '--strict' }}

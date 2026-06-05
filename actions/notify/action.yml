@@ -1,0 +1,38 @@
+name: Send Notification
+description: Send release/event notifications to Discord or Slack
+inputs:
+  type:
+    description: Notification type (discord, slack)
+    required: true
+  webhook-url:
+    description: Webhook URL secret name
+    required: true
+  message:
+    description: Custom message to send
+    required: false
+    default: ""
+  event:
+    description: Event type (release, issue, pr)
+    required: false
+    default: release
+
+runs:
+  using: composite
+  steps:
+    - name: Notify Discord
+      if: inputs.type == 'discord'
+      uses: Ilshidur/action-discord@master
+      env:
+        DISCORD_WEBHOOK: ${{ inputs.webhook-url }}
+        DISCORD_USERNAME: "GitHub Bot"
+      with:
+        args: ${{ inputs.message }}
+
+    - name: Notify Slack
+      if: inputs.type == 'slack'
+      uses: slackapi/slack-github-action@v2
+      with:
+        webhook: ${{ inputs.webhook-url }}
+        webhook-type: incoming-webhook
+        payload: |
+          {"text": "${{ inputs.message }}"}

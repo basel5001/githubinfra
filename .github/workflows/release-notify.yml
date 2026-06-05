@@ -1,0 +1,41 @@
+name: Release Notification
+on:
+  workflow_call:
+    inputs:
+      notify-type:
+        description: Notification platform (discord, slack)
+        required: true
+        type: string
+      message:
+        description: Custom message template
+        required: false
+        type: string
+        default: ""
+    secrets:
+      WEBHOOK_URL:
+        required: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Discord
+        if: inputs.notify-type == 'discord'
+        uses: Ilshidur/action-discord@master
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.WEBHOOK_URL }}
+          DISCORD_USERNAME: "Release Bot"
+        with:
+          args: >
+            ${{ inputs.message || format('**New Release:** {0}/{1} - {2}', github.repository_owner, github.event.repository.name, github.ref_name) }}
+
+      - name: Notify Slack
+        if: inputs.notify-type == 'slack'
+        uses: slackapi/slack-github-action@v2
+        with:
+          webhook: ${{ secrets.WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "${{ inputs.message || format('New Release: {0}/{1} - {2}', github.repository_owner, github.event.repository.name, github.ref_name) }}"
+            }

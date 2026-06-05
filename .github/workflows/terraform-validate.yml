@@ -1,0 +1,66 @@
+name: Terraform Validate
+on:
+  workflow_call:
+    inputs:
+      tf-version:
+        description: Terraform version
+        required: false
+        type: string
+        default: 1.9
+      working-dir:
+        description: Terraform working directory
+        required: false
+        type: string
+        default: .
+      run-fmt:
+        description: Run terraform fmt check
+        required: false
+        type: boolean
+        default: true
+      run-init:
+        description: Run terraform init
+        required: false
+        type: boolean
+        default: true
+      run-validate:
+        description: Run terraform validate
+        required: false
+        type: boolean
+        default: true
+      run-tfsec:
+        description: Run tfsec security scan
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.tf-version }}
+
+      - name: Terraform fmt
+        if: inputs.run-fmt
+        run: terraform fmt -check -recursive
+        working-directory: ${{ inputs.working-dir }}
+
+      - name: Terraform init
+        if: inputs.run-init
+        run: terraform init -backend=false
+        working-directory: ${{ inputs.working-dir }}
+
+      - name: Terraform validate
+        if: inputs.run-validate
+        run: terraform validate
+        working-directory: ${{ inputs.working-dir }}
+
+      - name: Run tfsec
+        if: inputs.run-tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working-directory: ${{ inputs.working-dir }}

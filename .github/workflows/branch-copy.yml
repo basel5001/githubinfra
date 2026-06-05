@@ -1,0 +1,38 @@
+name: Copy to Branches
+on:
+  workflow_call:
+    inputs:
+      source-branch:
+        description: Source branch to copy from
+        required: false
+        type: string
+        default: main
+      target-branches:
+        description: Comma-separated target branches
+        required: true
+        type: string
+      commit-message:
+        description: Commit message for the copy
+        required: false
+        type: string
+        default: "Sync from main branch"
+
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        branch: ${{ fromJSON(format('[{0}]', inputs.target-branches)) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Copy to ${{ matrix.branch }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b ${{ matrix.branch }} origin/${{ matrix.branch }} || git checkout -b ${{ matrix.branch }}
+          git pull origin ${{ inputs.source-branch }} --rebase
+          git push origin ${{ matrix.branch }}
+        shell: bash

@@ -1,0 +1,36 @@
+name: Generate SBOM
+on:
+  workflow_call:
+    inputs:
+      image:
+        description: Docker image to scan (image:tag)
+        required: true
+        type: string
+      format:
+        description: SBOM format (spdx, cyclonedx)
+        required: false
+        type: string
+        default: spdx
+      upload-artifact:
+        description: Upload SBOM as artifact
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  sbom:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate SBOM with Syft
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ inputs.image }}
+          format: ${{ inputs.format }}
+          artifact-name: sbom-${{ github.sha }}
+
+      - name: Upload SBOM artifact
+        if: inputs.upload-artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ inputs.format }}
+          path: sbom-${{ github.sha }}*

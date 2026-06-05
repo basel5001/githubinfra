@@ -1,0 +1,54 @@
+name: Stale Issue & PR Management
+on:
+  workflow_call:
+    inputs:
+      days-before-stale:
+        description: Days before marking as stale
+        required: false
+        type: number
+        default: 45
+      days-before-close:
+        description: Days before closing stale items
+        required: false
+        type: number
+        default: 5
+      stale-issue-label:
+        description: Label for stale issues
+        required: false
+        type: string
+        default: stale
+      stale-pr-label:
+        description: Label for stale PRs
+        required: false
+        type: string
+        default: stale
+      exempt-issue-labels:
+        description: Labels exempting issues from staleness
+        required: false
+        type: string
+        default: "pinned,security,dependencies"
+      exempt-pr-labels:
+        description: Labels exempting PRs from staleness
+        required: false
+        type: string
+        default: "pinned,security,dependencies"
+      operations-per-run:
+        description: Max operations per run
+        required: false
+        type: number
+        default: 100
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/stale@v9
+        with:
+          days-before-stale: ${{ inputs.days-before-stale }}
+          days-before-close: ${{ inputs.days-before-close }}
+          stale-issue-label: ${{ inputs.stale-issue-label }}
+          stale-pr-label: ${{ inputs.stale-pr-label }}
+          exempt-issue-labels: ${{ inputs.exempt-issue-labels }}
+          exempt-pr-labels: ${{ inputs.exempt-pr-labels }}
+          operations-per-run: ${{ inputs.operations-per-run }}
+          repo-token: ${{ secrets.GITHUB_TOKEN }}

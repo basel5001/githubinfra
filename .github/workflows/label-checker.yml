@@ -1,0 +1,25 @@
+name: PR Label Checker
+on:
+  workflow_call:
+    inputs:
+      required-labels:
+        description: Comma-separated required labels
+        required: true
+        type: string
+      mode:
+        description: 'any: at least one required, all: all required'
+        required: false
+        type: string
+        default: any
+
+jobs:
+  check-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check PR labels
+        uses: docker://agilepathway/pull-request-label-checker:latest
+        with:
+          one_of: ${{ inputs.mode == 'any' && inputs.required-labels || '' }}
+          all_of: ${{ inputs.mode == 'all' && inputs.required-labels || '' }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}

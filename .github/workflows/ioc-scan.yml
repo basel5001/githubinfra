@@ -1,0 +1,76 @@
+name: IOC & Supply Chain Security Scan
+on:
+  workflow_call:
+    inputs:
+      scan-dependency:
+        description: Run dependency vulnerability scan
+        required: false
+        type: boolean
+        default: true
+      scan-sast:
+        description: Run SAST (static analysis) scan
+        required: false
+        type: boolean
+        default: true
+      scan-secret:
+        description: Run secret scan
+        required: false
+        type: boolean
+        default: false
+      language:
+        description: Language for dependency scan (python, node, go)
+        required: false
+        type: string
+        default: python
+      fail-on-critical:
+        description: Fail on critical vulnerabilities
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  dependency-scan:
+    if: inputs.scan-dependency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy dependency scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+          exit-code: ${{ inputs.fail-on-critical && '1' || '0' }}
+      - name: Upload Trivy results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy
+
+  sast-scan:
+    if: inputs.scan-sast
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run CodeQL analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ inputs.language == 'python' && 'python' || inputs.language == 'node' && 'javascript' || inputs.language == 'go' && 'go' || 'python' }}
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+
+  osv-scanner:
+    if: inputs.scan-dependency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run OSV Scanner
+        uses: google/osv-scanner-action@v1
+        with:
+          scan-args: |-
+            --recursive
+            ./

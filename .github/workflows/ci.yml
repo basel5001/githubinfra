@@ -1,0 +1,94 @@
+name: CI Pipeline
+on:
+  workflow_call:
+    inputs:
+      language:
+        description: Language (python, node, go)
+        required: true
+        type: string
+      run-lint:
+        description: Whether to run linting
+        required: false
+        type: boolean
+        default: true
+      run-test:
+        description: Whether to run tests
+        required: false
+        type: boolean
+        default: true
+      test-command:
+        description: Custom test command
+        required: false
+        type: string
+        default: ""
+      lint-command:
+        description: Custom lint command
+        required: false
+        type: string
+        default: ""
+      python-version:
+        description: Python version
+        required: false
+        type: string
+        default: "3.11"
+      node-version:
+        description: Node version
+        required: false
+        type: string
+        default: "20"
+      go-version:
+        description: Go version
+        required: false
+        type: string
+        default: "1.22"
+    secrets:
+      GH_PAT:
+        description: GitHub PAT for private repos
+        required: false
+
+jobs:
+  lint:
+    if: inputs.run-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-env
+        with:
+          language: ${{ inputs.language }}
+          python-version: ${{ inputs.python-version }}
+          node-version: ${{ inputs.node-version }}
+          go-version: ${{ inputs.go-version }}
+      - name: Run lint
+        run: |
+          if [ -n "${{ inputs.lint-command }}" ]; then
+            ${{ inputs.lint-command }}
+          else
+            case "${{ inputs.language }}" in
+              python) ruff check . ;;
+              node) npm run lint ;;
+              go) go vet ./... ;;
+            esac
+          fi
+
+  test:
+    if: inputs.run-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-env
+        with:
+          language: ${{ inputs.language }}
+          python-version: ${{ inputs.python-version }}
+          node-version: ${{ inputs.node-version }}
+          go-version: ${{ inputs.go-version }}
+      - name: Run tests
+        run: |
+          if [ -n "${{ inputs.test-command }}" ]; then
+            ${{ inputs.test-command }}
+          else
+            case "${{ inputs.language }}" in
+              python) python -m pytest ;;
+              node) npm test ;;
+              go) go test ./... ;;
+            esac
+          fi
