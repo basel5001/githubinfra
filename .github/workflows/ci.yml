@@ -30,7 +30,7 @@ on:
         description: Python version
         required: false
         type: string
-        default: "3.11"
+        default: "3.12"
       node-version:
         description: Node version
         required: false
@@ -41,10 +41,6 @@ on:
         required: false
         type: string
         default: "1.22"
-    secrets:
-      GH_PAT:
-        description: GitHub PAT for private repos
-        required: false
 
 jobs:
   lint:
@@ -52,12 +48,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-env
+
+      - name: Setup Python
+        if: inputs.language == 'python'
+        uses: actions/setup-python@v5
         with:
-          language: ${{ inputs.language }}
           python-version: ${{ inputs.python-version }}
+
+      - name: Setup Node.js
+        if: inputs.language == 'node'
+        uses: actions/setup-node@v4
+        with:
           node-version: ${{ inputs.node-version }}
+
+      - name: Setup Go
+        if: inputs.language == 'go'
+        uses: actions/setup-go@v5
+        with:
           go-version: ${{ inputs.go-version }}
+
+      - name: Install Python deps
+        if: inputs.language == 'python'
+        run: |
+          pip install ruff
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+
+      - name: Install Node deps
+        if: inputs.language == 'node'
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Install Go deps
+        if: inputs.language == 'go'
+        run: go mod download
+
       - name: Run lint
         run: |
           if [ -n "${{ inputs.lint-command }}" ]; then
@@ -75,12 +100,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup-env
+
+      - name: Setup Python
+        if: inputs.language == 'python'
+        uses: actions/setup-python@v5
         with:
-          language: ${{ inputs.language }}
           python-version: ${{ inputs.python-version }}
+
+      - name: Setup Node.js
+        if: inputs.language == 'node'
+        uses: actions/setup-node@v4
+        with:
           node-version: ${{ inputs.node-version }}
+
+      - name: Setup Go
+        if: inputs.language == 'go'
+        uses: actions/setup-go@v5
+        with:
           go-version: ${{ inputs.go-version }}
+
+      - name: Install Python deps
+        if: inputs.language == 'python'
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
+
+      - name: Install Node deps
+        if: inputs.language == 'node'
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Install Go deps
+        if: inputs.language == 'go'
+        run: go mod download
+
       - name: Run tests
         run: |
           if [ -n "${{ inputs.test-command }}" ]; then
