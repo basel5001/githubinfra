@@ -1,3 +1,6 @@
+![Security](https://github.com/basel5001/githubinfra/actions/workflows/security.yml/badge.svg)
+![Terraform](https://github.com/basel5001/githubinfra/actions/workflows/terraform.yml/badge.svg)
+
 # githubinfra
 
 Centralized GitHub Actions workflows and composite actions shared across all basel5001 repos.
