@@ -1,0 +1,141 @@
+owner: basel5001
+
+defaults:
+  visibility: public
+  delete_branch_on_merge: true
+  allow_squash_merge: true
+  allow_merge_commit: true
+  allow_rebase_merge: false
+  has_issues: true
+  has_wiki: false
+  has_projects: false
+  vulnerability_alerts: true
+  branch_protection:
+    required_reviews: 0
+    dismiss_stale_reviews: false
+    require_code_owner_reviews: false
+    enforce_admins: true
+    required_status_checks: []
+  workflows:
+    - security.yml
+    - renovate.yml
+
+repos:
+  githubinfra:
+    description: "Centralized GitHub Actions workflows and composite actions shared across all repos"
+    topics: [ci-cd, devops, github-actions, reusable-workflows, shared-workflows]
+    workflows: []  # doesn't consume its own workflows
+
+  cloud-platform:
+    description: "Internal Developer Platform with AI-powered infrastructure provisioning (AWS Bedrock + Terraform)"
+    topics: [developer-platform, idp, fastapi, terraform, aws-bedrock, self-service, infrastructure, platform-engineering]
+    workflows: [security.yml, renovate.yml, ci-python.yml]
+
+  devsecops-pipeline:
+    description: "Complete DevSecOps scanning platform: SAST, SCA, IaC, secrets + AI risk analysis (AWS Bedrock)"
+    topics: [devsecops, security-scanning, sast, trivy, semgrep, checkov, gitleaks, github-action, aws-bedrock]
+    workflows: [security.yml, renovate.yml, ci-python.yml]
+
+  observability-stack:
+    description: "Self-hosted monitoring platform: Prometheus + Grafana + Loki + Tempo + AI anomaly detection"
+    topics: [observability, prometheus, grafana, loki, tempo, monitoring, alerting, docker-compose, aws-bedrock]
+    workflows: [security.yml, renovate.yml]
+
+  disaster-recovery-aws:
+    description: "Automated AWS disaster recovery: cross-region failover, DR drills, AI runbook generation"
+    topics: [disaster-recovery, aws, terraform, lambda, cross-region, failover, sre, aws-bedrock]
+    workflows: [security.yml, renovate.yml, terraform-validate.yml]
+
+  gitops-cluster:
+    description: "Full GitOps platform: ArgoCD + Crossplane + Kyverno + Argo Rollouts, multi-env promotion"
+    topics: [gitops, argocd, crossplane, kyverno, argo-rollouts, kubernetes, progressive-delivery, platform-engineering]
+    workflows: [security.yml, renovate.yml]
+
+  chaos-engineering:
+    description: "Kubernetes chaos engineering toolkit with AI analysis (AWS Bedrock): pod kill, network latency, CPU stress"
+    topics: [chaos-engineering, kubernetes, sre, resilience, fault-injection, aws-bedrock, reliability]
+    workflows: [security.yml, renovate.yml, ci-python.yml]
+
+  secret-vault:
+    description: "HashiCorp Vault deployment as code: auto-unseal, secret rotation, K8s CSI integration"
+    topics: [hashicorp-vault, secrets-management, terraform, aws-kms, kubernetes, security, auto-rotation]
+    workflows: [security.yml, renovate.yml, terraform-validate.yml]
+
+  multi-cloud-landing-zone:
+    description: "AWS Organization bootstrapper: SCPs, SSO, GuardDuty, Security Hub, account vending — all Terraform"
+    topics: [aws-landing-zone, aws-organizations, terraform, scp, sso, guardduty, security-hub, governance]
+    workflows: [security.yml, renovate.yml, terraform-validate.yml]
+
+  terraform-aws-modules:
+    description: "Reusable Terraform modules for AWS (VPC, EKS, Lambda, S3)"
+    topics: [terraform, aws, modules, vpc, eks, lambda, s3, infrastructure-as-code]
+    workflows: [security.yml, renovate.yml, terraform-validate.yml]
+
+  aws-cost-optimizer:
+    description: "AWS Lambda cost anomaly detection with Slack alerts"
+    topics: [aws, cost-optimization, lambda, python, slack, finops, cost-explorer]
+    workflows: [security.yml, renovate.yml, ci-python.yml]
+
+  container-security-scanner:
+    description: "GitHub Action for container vulnerability scanning (Trivy + Grype + Syft SBOM)"
+    topics: [github-action, container-security, trivy, grype, syft, sbom, vulnerability-scanning, devsecops]
+    workflows: [security.yml, renovate.yml]
+
+  devops-dashboard:
+    description: "DORA metrics dashboard - deployment frequency, lead time, MTTR, change failure rate"
+    topics: [dora-metrics, devops, dashboard, fastapi, python, github-api, sre]
+    workflows: [security.yml, renovate.yml, ci-python.yml]
+
+  aws-audit-reporter:
+    description: "AWS Lambda audit automation that exports infrastructure reports to S3."
+    topics: [audit, automation, aws, lambda, python, security]
+    workflows: [security.yml, renovate.yml, ci-python.yml]
+
+  aws-vpn-provisioner:
+    description: "Terraform-based AWS VPN deployment for OpenVPN and WireGuard."
+    topics: [terraform, aws, vpn, openvpn, wireguard, infrastructure]
+    workflows: [security.yml, renovate.yml, terraform-validate.yml]
+
+  study-buddy-ai:
+    description: "React frontend for generating quizzes from study material with an external AI backend."
+    topics: [ai, amazon-bedrock, education, quiz, react]
+    workflows: [security.yml, renovate.yml]
+
+  debtless:
+    description: "Copilot-powered automatic code and technical debt gatekeeper"
+    topics: [technical-debt, github-action, code-quality, copilot]
+    visibility: private
+    workflows: [security.yml, renovate.yml]
+
+  n8n-social-automation:
+    description: "Automated social media publishing with n8n and AI-generated content (GPT-4o)"
+    topics: [n8n, social-media, automation, openai, facebook, twitter, linkedin, docker]
+    workflows: [security.yml, renovate.yml]
+
+  local-tunnel-server:
+    description: "Expose local servers to the internet using free software (Cloudflare Tunnel, DuckDNS, WireGuard, FRP, Rathole, SSH)"
+    topics: [tunneling, cloudflare-tunnel, wireguard, frp, duckdns, reverse-proxy, self-hosted, homelab, networking]
+    workflows: [security.yml, renovate.yml]
+
+  udapeople-cicd:
+    description: "Full-stack CI/CD project with TypeScript backend and React frontend"
+    topics: [cicd, devops, full-stack, nodejs, typescript]
+    workflows: [security.yml, renovate.yml]
+
+  Bash-Scripting:
+    description: "Interactive bash script for managing Linux users and groups"
+    topics: [bash, scripting, linux, system-administration]
+    default_branch: main
+    workflows: [security.yml, renovate.yml]
+
+  C-Encreption-Elqaisr:
+    description: "Cisco IOU Keygen and C# Caesar cipher encryption"
+    topics: [csharp, python, encryption, cisco]
+    default_branch: master
+    workflows: [security.yml, renovate.yml]
+
+  AWS_Scripts:
+    description: "AWS automation scripts for common infrastructure tasks"
+    topics: [automation, aws, boto3, python, scripts]
+    visibility: private
+    workflows: [security.yml, renovate.yml, ci-python.yml]

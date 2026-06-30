@@ -49,3 +49,46 @@ jobs:
 - `github-actions-for-ci-cd-4375061` → `branch-copy.yml`
 - `cert-prep-terraform-associate-003-3330038` → `branch-copy.yml`
 - `advanced-terraform-3099246` → `branch-copy.yml`
+
+## Repo Management
+
+All repos are managed as code from this repository.
+
+### Configuration
+
+Edit `repos.yml` to change any repo's settings:
+- Description, topics, visibility
+- Branch protection rules
+- Merge settings
+- Workflow assignments
+
+### Commands
+
+```bash
+cd management
+npm install
+
+# Show what would change
+GITHUB_TOKEN=ghp_xxx npm run diff
+
+# Preview changes (dry run)
+GITHUB_TOKEN=ghp_xxx npm run sync:dry-run
+
+# Apply changes
+GITHUB_TOKEN=ghp_xxx npm run sync
+```
+
+### Terraform
+
+```bash
+cd terraform
+terraform init
+terraform plan -var="github_token=$GITHUB_TOKEN"
+terraform apply -var="github_token=$GITHUB_TOKEN"
+```
+
+### CI
+
+Changes to `repos.yml` are automatically applied on merge to main via the `manage-repos.yml` workflow.
+
+Requires a `REPO_MANAGEMENT_TOKEN` secret with `repo` and `admin:org` scopes.
