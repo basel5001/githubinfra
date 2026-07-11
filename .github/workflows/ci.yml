@@ -47,7 +47,7 @@ jobs:
     if: inputs.run-lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Python
         if: inputs.language == 'python'
@@ -99,7 +99,7 @@ jobs:
     if: inputs.run-test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Python
         if: inputs.language == 'python'

@@ -16,7 +16,7 @@ jobs:
   check-labels:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Check PR labels
         uses: docker://agilepathway/pull-request-label-checker:latest
         with:

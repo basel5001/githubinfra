@@ -33,7 +33,7 @@ jobs:
     if: inputs.scan-dependency
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run Trivy dependency scan
         uses: aquasecurity/trivy-action@master
         with:
@@ -55,7 +55,7 @@ jobs:
     permissions:
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run CodeQL analysis
         uses: github/codeql-action/init@v3
         with:
@@ -67,7 +67,7 @@ jobs:
     if: inputs.scan-dependency
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Run OSV Scanner
         uses: google/osv-scanner-action@v1
         with:

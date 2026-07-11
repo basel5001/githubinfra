@@ -24,7 +24,7 @@ jobs:
       matrix:
         branch: ${{ fromJSON(format('[{0}]', inputs.target-branches)) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
