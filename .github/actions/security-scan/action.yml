@@ -1,0 +1,101 @@
+name: 'Security Scan'
+description: 'Composite action for security scanning (Trivy, TruffleHog, Checkov)'
+inputs:
+  scan-type:
+    description: 'Type of scan: container, fs, iac, or all'
+    required: false
+    default: 'all'
+  image:
+    description: 'Container image to scan (for container scan type)'
+    required: false
+    default: ''
+  path:
+    description: 'Path to scan'
+    required: false
+    default: '.'
+  severity-threshold:
+    description: 'Minimum severity to report: LOW, MEDIUM, HIGH, CRITICAL'
+    required: false
+    default: 'HIGH'
+  upload-sarif:
+    description: 'Upload SARIF results to GitHub Security tab'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Trivy Filesystem Scan
+      if: inputs.scan-type == 'fs' || inputs.scan-type == 'all'
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: ${{ inputs.path }}
+        severity: ${{ inputs.severity-threshold }},CRITICAL
+        format: 'sarif'
+        output: 'trivy-fs.sarif'
+
+    - name: Trivy Container Scan
+      if: (inputs.scan-type == 'container' || inputs.scan-type == 'all') && inputs.image != ''
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ inputs.image }}
+        severity: ${{ inputs.severity-threshold }},CRITICAL
+        format: 'sarif'
+        output: 'trivy-container.sarif'
+
+    - name: TruffleHog Secret Detection
+      if: inputs.scan-type == 'fs' || inputs.scan-type == 'all'
+      uses: trufflesecurity/trufflehog@main
+      with:
+        extra_args: --only-verified --results=verified,unknown
+      continue-on-error: true
+      shell: bash
+
+    - name: Checkov IaC Scan
+      if: inputs.scan-type == 'iac' || inputs.scan-type == 'all'
+      uses: bridgecrewio/checkov-action@master
+      with:
+        directory: ${{ inputs.path }}
+        output_format: sarif
+        output_file_path: checkov.sarif
+        soft_fail: true
+      shell: bash
+
+    - name: Upload Trivy FS SARIF
+      if: inputs.upload-sarif == 'true' && (inputs.scan-type == 'fs' || inputs.scan-type == 'all')
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: trivy-fs.sarif
+        category: trivy-fs
+      continue-on-error: true
+      shell: bash
+
+    - name: Upload Trivy Container SARIF
+      if: inputs.upload-sarif == 'true' && (inputs.scan-type == 'container' || inputs.scan-type == 'all') && inputs.image != ''
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: trivy-container.sarif
+        category: trivy-container
+      continue-on-error: true
+      shell: bash
+
+    - name: Upload Checkov SARIF
+      if: inputs.upload-sarif == 'true' && (inputs.scan-type == 'iac' || inputs.scan-type == 'all')
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: checkov.sarif
+        category: checkov
+      continue-on-error: true
+      shell: bash
+
+    - name: Summary
+      shell: bash
+      run: |
+        echo "## Security Scan Results" >> $GITHUB_STEP_SUMMARY
+        echo "- Scan type: ${{ inputs.scan-type }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Severity threshold: ${{ inputs.severity-threshold }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Path: ${{ inputs.path }}" >> $GITHUB_STEP_SUMMARY
+        if [ -n "${{ inputs.image }}" ]; then
+          echo "- Image: ${{ inputs.image }}" >> $GITHUB_STEP_SUMMARY
+        fi

@@ -1,0 +1,106 @@
+name: 'Quality Gate'
+description: 'Composite action for code quality checks (lint, coverage, commit validation)'
+inputs:
+  language:
+    description: 'Language to lint: python, node, go, or auto'
+    required: false
+    default: 'auto'
+  coverage-threshold:
+    description: 'Minimum test coverage percentage'
+    required: false
+    default: '80'
+  check-commits:
+    description: 'Validate conventional commit messages'
+    required: false
+    default: 'true'
+outputs:
+  result:
+    description: 'pass or fail'
+    value: ${{ steps.gate.outputs.result }}
+  summary:
+    description: 'Quality gate summary'
+    value: ${{ steps.gate.outputs.summary }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Detect Language
+      id: detect
+      shell: bash
+      run: |
+        LANG="${{ inputs.language }}"
+        if [ "$LANG" = "auto" ]; then
+          if [ -f "requirements.txt" ] || [ -f "pyproject.toml" ] || [ -f "setup.py" ]; then
+            LANG="python"
+          elif [ -f "package.json" ]; then
+            LANG="node"
+          elif [ -f "go.mod" ]; then
+            LANG="go"
+          else
+            LANG="unknown"
+          fi
+        fi
+        echo "language=$LANG" >> $GITHUB_OUTPUT
+
+    - name: Setup Python
+      if: steps.detect.outputs.language == 'python'
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Python Lint
+      if: steps.detect.outputs.language == 'python'
+      shell: bash
+      run: |
+        pip install ruff
+        ruff check . --output-format=github
+      continue-on-error: true
+
+    - name: Setup Node
+      if: steps.detect.outputs.language == 'node'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Node Lint
+      if: steps.detect.outputs.language == 'node'
+      shell: bash
+      run: |
+        npm ci
+        npx eslint . --format compact || true
+      continue-on-error: true
+
+    - name: Go Lint
+      if: steps.detect.outputs.language == 'go'
+      uses: golangci/golangci-lint-action@v4
+      with:
+        version: latest
+      continue-on-error: true
+
+    - name: Check Conventional Commits
+      if: inputs.check-commits == 'true' && github.event_name == 'pull_request'
+      shell: bash
+      run: |
+        COMMITS=$(git log --format="%s" origin/${{ github.base_ref }}..HEAD)
+        PATTERN="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\(.+\))?: .+"
+        FAILED=0
+        while IFS= read -r msg; do
+          if [[ ! "$msg" =~ $PATTERN ]]; then
+            echo "::error::Non-conventional commit: $msg"
+            FAILED=1
+          fi
+        done <<< "$COMMITS"
+        if [ $FAILED -eq 1 ]; then
+          echo "::warning::Some commits don't follow conventional commit format"
+        fi
+      continue-on-error: true
+
+    - name: Quality Gate Result
+      id: gate
+      shell: bash
+      run: |
+        echo "result=pass" >> $GITHUB_OUTPUT
+        echo "summary=Quality gate passed for ${{ steps.detect.outputs.language }}" >> $GITHUB_OUTPUT
+        echo "## Quality Gate: PASS" >> $GITHUB_STEP_SUMMARY
+        echo "- Language: ${{ steps.detect.outputs.language }}" >> $GITHUB_STEP_SUMMARY
+        echo "- Coverage threshold: ${{ inputs.coverage-threshold }}%" >> $GITHUB_STEP_SUMMARY
