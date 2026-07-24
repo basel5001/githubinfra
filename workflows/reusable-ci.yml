@@ -1,0 +1,61 @@
+name: Reusable CI Pipeline
+
+on:
+  workflow_call:
+    inputs:
+      language:
+        description: 'Language: python, node, go, or auto'
+        type: string
+        default: 'auto'
+      scan-type:
+        description: 'Security scan type: container, fs, iac, or all'
+        type: string
+        default: 'all'
+      image:
+        description: 'Container image to scan'
+        type: string
+        default: ''
+      severity-threshold:
+        description: 'Minimum severity: LOW, MEDIUM, HIGH, CRITICAL'
+        type: string
+        default: 'HIGH'
+      coverage-threshold:
+        description: 'Minimum test coverage percentage'
+        type: string
+        default: '80'
+      skip-security:
+        description: 'Skip security scanning'
+        type: boolean
+        default: false
+      skip-quality:
+        description: 'Skip quality gate'
+        type: boolean
+        default: false
+
+jobs:
+  quality-gate:
+    if: ${{ !inputs.skip-quality }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Quality Gate
+        uses: basel5001/githubinfra/.github/actions/quality-gate@main
+        with:
+          language: ${{ inputs.language }}
+          coverage-threshold: ${{ inputs.coverage-threshold }}
+
+  security-scan:
+    if: ${{ !inputs.skip-security }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Security Scan
+        uses: basel5001/githubinfra/.github/actions/security-scan@main
+        with:
+          scan-type: ${{ inputs.scan-type }}
+          image: ${{ inputs.image }}
+          severity-threshold: ${{ inputs.severity-threshold }}

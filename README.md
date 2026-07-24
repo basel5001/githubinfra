@@ -32,6 +32,7 @@ jobs:
 | `release-notify.yml` | Release notifications to Discord/Slack |
 | `branch-copy.yml` | Copy repo content to multiple branches |
 | `label-checker.yml` | Enforce PR labeling standards |
+| `workflows/reusable-ci.yml` | Reusable CI with security scan + quality gate |
 
 ## Composite Actions
 
@@ -40,6 +41,60 @@ jobs:
 | `actions/setup-env` | Setup Python/Node/Go environment with caching |
 | `actions/docker-build` | Build Docker images with Buildx caching |
 | `actions/notify` | Send Discord/Slack webhook notifications |
+| `actions/security-scan` | Trivy + TruffleHog + Checkov with SARIF upload |
+| `actions/quality-gate` | Lint + coverage + conventional commit checks |
+
+### Security Scan Action
+
+Runs Trivy (filesystem/container), TruffleHog (secrets), and Checkov (IaC) with configurable severity threshold and SARIF upload.
+
+```yaml
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: basel5001/githubinfra/.github/actions/security-scan@main
+        with:
+          scan-type: all          # container, fs, iac, or all
+          image: myapp:latest     # optional, for container scans
+          severity-threshold: HIGH
+          upload-sarif: 'true'
+```
+
+### Quality Gate Action
+
+Auto-detects language, runs linting, checks coverage threshold, and validates conventional commits.
+
+```yaml
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: basel5001/githubinfra/.github/actions/quality-gate@main
+        with:
+          language: auto
+          coverage-threshold: '80'
+          check-commits: 'true'
+```
+
+### Reusable CI Workflow
+
+Combines security scan + quality gate into one reusable workflow:
+
+```yaml
+jobs:
+  ci:
+    uses: basel5001/githubinfra/workflows/reusable-ci.yml@main
+    with:
+      language: python
+      scan-type: all
+      severity-threshold: HIGH
+      coverage-threshold: '80'
+```
 
 ## Repos Using githubinfra
 
