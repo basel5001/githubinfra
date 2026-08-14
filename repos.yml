@@ -18,6 +18,7 @@ defaults:
     required_status_checks: []
   workflows:
     - security.yml
+    - dependabot-automerge.yml
     - renovate.yml
 
 repos:
