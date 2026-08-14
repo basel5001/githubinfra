@@ -20,6 +20,8 @@ defaults:
     - security.yml
     - dependabot-automerge.yml
     - renovate.yml
+    - dependency-review.yml
+    - pr-size-labeler.yml
 
 repos:
   githubinfra:
@@ -40,7 +42,7 @@ repos:
   observability-stack:
     description: "Self-hosted monitoring platform: Prometheus + Grafana + Loki + Tempo + AI anomaly detection"
     topics: [observability, prometheus, grafana, loki, tempo, monitoring, alerting, docker-compose, aws-bedrock]
-    workflows: [security.yml, renovate.yml]
+    workflows: [security.yml, renovate.yml, ci-docker.yml]
 
   disaster-recovery-aws:
     description: "Automated AWS disaster recovery: cross-region failover, DR drills, AI runbook generation"
@@ -111,7 +113,7 @@ repos:
   n8n-social-automation:
     description: "Automated social media publishing with n8n and AI-generated content (GPT-4o)"
     topics: [n8n, social-media, automation, openai, facebook, twitter, linkedin, docker]
-    workflows: [security.yml, renovate.yml]
+    workflows: [security.yml, renovate.yml, ci-docker.yml]
 
   local-tunnel-server:
     description: "Expose local servers to the internet using free software (Cloudflare Tunnel, DuckDNS, WireGuard, FRP, Rathole, SSH)"

@@ -1,0 +1,73 @@
+name: PR Size Labeler
+
+on:
+  workflow_call:
+    inputs:
+      xs-max:
+        description: Max lines changed for XS
+        required: false
+        type: number
+        default: 10
+      s-max:
+        description: Max lines changed for S
+        required: false
+        type: number
+        default: 50
+      m-max:
+        description: Max lines changed for M
+        required: false
+        type: number
+        default: 200
+      l-max:
+        description: Max lines changed for L
+        required: false
+        type: number
+        default: 500
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const { additions, deletions } = context.payload.pull_request;
+            const total = additions + deletions;
+
+            const sizes = [
+              { label: 'size/XS', max: ${{ inputs.xs-max }} },
+              { label: 'size/S',  max: ${{ inputs.s-max }} },
+              { label: 'size/M',  max: ${{ inputs.m-max }} },
+              { label: 'size/L',  max: ${{ inputs.l-max }} },
+            ];
+
+            let sizeLabel = 'size/XL';
+            for (const s of sizes) {
+              if (total <= s.max) { sizeLabel = s.label; break; }
+            }
+
+            const allSizeLabels = [...sizes.map(s => s.label), 'size/XL'];
+            const currentLabels = context.payload.pull_request.labels.map(l => l.name);
+            const toRemove = currentLabels.filter(l => allSizeLabels.includes(l) && l !== sizeLabel);
+
+            for (const label of toRemove) {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, name: label,
+              }).catch(() => {});
+            }
+
+            if (!currentLabels.includes(sizeLabel)) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, labels: [sizeLabel],
+              });
+            }
+
+            const emoji = { 'size/XS': '🟢', 'size/S': '🟢', 'size/M': '🟡', 'size/L': '🟠', 'size/XL': '🔴' };
+            console.log(`${emoji[sizeLabel]} ${sizeLabel} (${total} lines changed: +${additions} -${deletions})`);

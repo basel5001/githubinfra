@@ -1,0 +1,86 @@
+name: CI - Docker
+
+on:
+  workflow_call:
+    inputs:
+      dockerfile:
+        description: Path to Dockerfile
+        required: false
+        type: string
+        default: Dockerfile
+      context:
+        description: Docker build context
+        required: false
+        type: string
+        default: "."
+      run-hadolint:
+        description: Lint Dockerfile with Hadolint
+        required: false
+        type: boolean
+        default: true
+      run-build:
+        description: Run docker build smoke test
+        required: false
+        type: boolean
+        default: true
+      run-trivy:
+        description: Scan built image with Trivy
+        required: false
+        type: boolean
+        default: true
+      hadolint-ignore:
+        description: "Comma-separated Hadolint rules to ignore (e.g. DL3008,DL3013)"
+        required: false
+        type: string
+        default: ""
+      trivy-severity:
+        description: Trivy severity filter
+        required: false
+        type: string
+        default: "CRITICAL,HIGH"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  hadolint:
+    if: ${{ inputs.run-hadolint }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ${{ inputs.dockerfile }}
+          ignore: ${{ inputs.hadolint-ignore }}
+          failure-threshold: warning
+
+  build-and-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        if: ${{ inputs.run-build }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.context }}
+          file: ${{ inputs.dockerfile }}
+          push: false
+          load: true
+          tags: ci-test:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Trivy scan
+        if: ${{ inputs.run-trivy && inputs.run-build }}
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ci-test:${{ github.sha }}
+          format: table
+          severity: ${{ inputs.trivy-severity }}
+          exit-code: 1

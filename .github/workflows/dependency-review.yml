@@ -1,0 +1,39 @@
+name: Dependency Review
+
+on:
+  workflow_call:
+    inputs:
+      fail-on-severity:
+        description: "Minimum severity to fail: low, moderate, high, critical"
+        required: false
+        type: string
+        default: high
+      deny-licenses:
+        description: "Comma-separated SPDX licenses to deny"
+        required: false
+        type: string
+        default: ""
+      allow-ghsas:
+        description: "Comma-separated GitHub Advisory IDs to allow"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: ${{ inputs.fail-on-severity }}
+          deny-licenses: ${{ inputs.deny-licenses }}
+          allow-ghsas: ${{ inputs.allow-ghsas }}
+          comment-summary-in-pr: always
