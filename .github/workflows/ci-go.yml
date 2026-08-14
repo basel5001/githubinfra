@@ -1,0 +1,112 @@
+name: CI - Go
+
+on:
+  workflow_call:
+    inputs:
+      go-version:
+        description: Go version to use
+        required: false
+        type: string
+        default: "1.22"
+      go-versions:
+        description: "JSON array for matrix testing (overrides go-version)"
+        required: false
+        type: string
+        default: ""
+      working-dir:
+        description: Working directory
+        required: false
+        type: string
+        default: "."
+      run-lint:
+        description: Run golangci-lint
+        required: false
+        type: boolean
+        default: true
+      run-test:
+        description: Run tests
+        required: false
+        type: boolean
+        default: true
+      run-build:
+        description: Run go build
+        required: false
+        type: boolean
+        default: true
+      lint-timeout:
+        description: golangci-lint timeout
+        required: false
+        type: string
+        default: "5m"
+      coverage-threshold:
+        description: Minimum coverage percentage (0 to disable)
+        required: false
+        type: number
+        default: 0
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    if: ${{ inputs.run-lint }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ inputs.go-version }}
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: ${{ inputs.working-dir }}
+          args: --timeout=${{ inputs.lint-timeout }}
+
+  test:
+    if: ${{ inputs.run-test }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: ${{ inputs.go-versions != '' && fromJSON(inputs.go-versions) || fromJSON(format('["{0}"]', inputs.go-version)) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+
+      - name: Download deps
+        working-directory: ${{ inputs.working-dir }}
+        run: go mod download
+
+      - name: Run tests
+        working-directory: ${{ inputs.working-dir }}
+        run: |
+          if [ "${{ inputs.coverage-threshold }}" != "0" ]; then
+            go test -race -coverprofile=coverage.out -covermode=atomic ./...
+            COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+            echo "Coverage: ${COVERAGE}%"
+            if [ "$(echo "$COVERAGE < ${{ inputs.coverage-threshold }}" | bc -l)" -eq 1 ]; then
+              echo "::error::Coverage ${COVERAGE}% is below threshold ${{ inputs.coverage-threshold }}%"
+              exit 1
+            fi
+          else
+            go test -race ./...
+          fi
+
+  build:
+    if: ${{ inputs.run-build }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ inputs.go-version }}
+
+      - name: Build
+        working-directory: ${{ inputs.working-dir }}
+        run: go build ./...

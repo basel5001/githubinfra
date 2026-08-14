@@ -1,0 +1,163 @@
+name: Kubernetes Manifest Validation
+
+on:
+  workflow_call:
+    inputs:
+      manifests-dir:
+        description: Directory containing K8s manifests
+        required: false
+        type: string
+        default: "."
+      k8s-version:
+        description: Kubernetes version for schema validation
+        required: false
+        type: string
+        default: "1.30.0"
+      run-kubeconform:
+        description: Run kubeconform schema validation
+        required: false
+        type: boolean
+        default: true
+      run-kustomize:
+        description: Run kustomize build validation
+        required: false
+        type: boolean
+        default: false
+      run-helm:
+        description: Run helm template validation
+        required: false
+        type: boolean
+        default: false
+      run-pluto:
+        description: Run Pluto deprecated API check
+        required: false
+        type: boolean
+        default: true
+      run-kyverno:
+        description: Run Kyverno policy tests
+        required: false
+        type: boolean
+        default: false
+      helm-chart-dir:
+        description: Helm chart directory (when run-helm is true)
+        required: false
+        type: string
+        default: "."
+      helm-values-file:
+        description: Helm values file
+        required: false
+        type: string
+        default: ""
+      kustomize-dirs:
+        description: "Space-separated kustomize overlay dirs"
+        required: false
+        type: string
+        default: "."
+      kyverno-policies-dir:
+        description: Directory containing Kyverno policies
+        required: false
+        type: string
+        default: "policies"
+      kyverno-test-dir:
+        description: Directory containing Kyverno test resources
+        required: false
+        type: string
+        default: "tests"
+
+permissions:
+  contents: read
+
+jobs:
+  kubeconform:
+    if: ${{ inputs.run-kubeconform }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Validate manifests
+        run: |
+          find ${{ inputs.manifests-dir }} -name '*.yaml' -o -name '*.yml' | \
+            grep -v kustomization | \
+            xargs kubeconform \
+              -kubernetes-version ${{ inputs.k8s-version }} \
+              -schema-location default \
+              -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+              -summary \
+              -strict \
+              -output text || true
+
+  kustomize:
+    if: ${{ inputs.run-kustomize }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install kustomize
+        uses: imranismail/setup-kustomize@v2
+
+      - name: Build overlays
+        run: |
+          for dir in ${{ inputs.kustomize-dirs }}; do
+            echo "=== Building $dir ==="
+            kustomize build "$dir" > /dev/null
+            echo "✅ $dir valid"
+          done
+
+  helm:
+    if: ${{ inputs.run-helm }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Helm
+        uses: azure/setup-helm@v4
+
+      - name: Lint chart
+        run: helm lint ${{ inputs.helm-chart-dir }}
+
+      - name: Template chart
+        run: |
+          ARGS="${{ inputs.helm-chart-dir }}"
+          if [ -n "${{ inputs.helm-values-file }}" ]; then
+            ARGS="$ARGS -f ${{ inputs.helm-values-file }}"
+          fi
+          helm template test $ARGS > /dev/null
+          echo "✅ Helm template renders successfully"
+
+  pluto:
+    if: ${{ inputs.run-pluto }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Pluto
+        run: |
+          curl -sSL https://github.com/FairwindsOps/pluto/releases/latest/download/pluto_linux_amd64.tar.gz | tar xz
+          sudo mv pluto /usr/local/bin/
+
+      - name: Check deprecated APIs
+        run: |
+          pluto detect-files -d ${{ inputs.manifests-dir }} \
+            --target-versions k8s=v${{ inputs.k8s-version }} \
+            -o wide || true
+
+  kyverno:
+    if: ${{ inputs.run-kyverno }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Kyverno CLI
+        run: |
+          curl -sSL https://github.com/kyverno/kyverno/releases/latest/download/kyverno-cli_linux_x86_64.tar.gz | tar xz
+          sudo mv kyverno /usr/local/bin/
+
+      - name: Run Kyverno tests
+        run: |
+          kyverno test ${{ inputs.kyverno-test-dir }} \
+            --policy ${{ inputs.kyverno-policies-dir }}

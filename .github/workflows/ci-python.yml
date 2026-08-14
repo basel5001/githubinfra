@@ -1,0 +1,145 @@
+name: CI - Python
+
+on:
+  workflow_call:
+    inputs:
+      python-version:
+        description: Python version to use
+        required: false
+        type: string
+        default: "3.12"
+      python-versions:
+        description: "JSON array of versions for matrix testing (overrides python-version)"
+        required: false
+        type: string
+        default: ""
+      working-dir:
+        description: Working directory
+        required: false
+        type: string
+        default: "."
+      run-lint:
+        description: Run ruff linting
+        required: false
+        type: boolean
+        default: true
+      run-test:
+        description: Run pytest
+        required: false
+        type: boolean
+        default: true
+      run-type-check:
+        description: Run mypy type checking
+        required: false
+        type: boolean
+        default: false
+      test-command:
+        description: Custom test command (default pytest)
+        required: false
+        type: string
+        default: ""
+      coverage-threshold:
+        description: Minimum coverage percentage (0 to disable)
+        required: false
+        type: number
+        default: 0
+      upload-coverage:
+        description: Upload coverage report as artifact
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    if: ${{ inputs.run-lint }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Ruff lint + format check
+        uses: chartboost/ruff-action@v1
+        with:
+          args: check --output-format=github
+          src: ${{ inputs.working-dir }}
+
+      - name: Ruff format check
+        uses: chartboost/ruff-action@v1
+        with:
+          args: format --check
+          src: ${{ inputs.working-dir }}
+
+  type-check:
+    if: ${{ inputs.run-type-check }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+          cache: pip
+
+      - name: Install deps
+        working-directory: ${{ inputs.working-dir }}
+        run: |
+          pip install mypy
+          for f in requirements.txt requirements-dev.txt; do
+            [ -f "$f" ] && pip install -r "$f"
+          done
+          [ -f pyproject.toml ] && pip install -e ".[dev]" 2>/dev/null || true
+
+      - name: Run mypy
+        working-directory: ${{ inputs.working-dir }}
+        run: mypy . --ignore-missing-imports
+
+  test:
+    if: ${{ inputs.run-test }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ${{ inputs.python-versions != '' && fromJSON(inputs.python-versions) || fromJSON(format('["{0}"]', inputs.python-version)) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install deps
+        working-directory: ${{ inputs.working-dir }}
+        run: |
+          for f in requirements.txt requirements-dev.txt; do
+            [ -f "$f" ] && pip install -r "$f"
+          done
+          [ -f pyproject.toml ] && pip install -e ".[dev]" 2>/dev/null || true
+          pip install pytest pytest-cov
+
+      - name: Run tests
+        working-directory: ${{ inputs.working-dir }}
+        run: |
+          if [ -n "${{ inputs.test-command }}" ]; then
+            ${{ inputs.test-command }}
+          else
+            ARGS="--tb=short -q"
+            if [ "${{ inputs.coverage-threshold }}" != "0" ] || [ "${{ inputs.upload-coverage }}" == "true" ]; then
+              ARGS="$ARGS --cov --cov-report=xml --cov-report=term --cov-fail-under=${{ inputs.coverage-threshold }}"
+            fi
+            python -m pytest $ARGS
+          fi
+
+      - name: Upload coverage
+        if: ${{ inputs.upload-coverage && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-py${{ matrix.python-version }}
+          path: ${{ inputs.working-dir }}/coverage.xml
+          retention-days: 7

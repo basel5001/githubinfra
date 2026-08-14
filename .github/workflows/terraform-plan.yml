@@ -1,0 +1,226 @@
+name: Terraform Plan & Drift Detection
+
+on:
+  workflow_call:
+    inputs:
+      tf-version:
+        description: Terraform version
+        required: false
+        type: string
+        default: "1.9"
+      working-dir:
+        description: Terraform working directory
+        required: false
+        type: string
+        default: "."
+      mode:
+        description: "Mode: plan (PR comment), drift (scheduled check)"
+        required: false
+        type: string
+        default: plan
+      run-checkov:
+        description: Run Checkov security scan
+        required: false
+        type: boolean
+        default: true
+      run-cost:
+        description: Run Infracost estimate
+        required: false
+        type: boolean
+        default: false
+      aws-region:
+        description: AWS region for provider init
+        required: false
+        type: string
+        default: us-east-1
+    secrets:
+      AWS_ACCESS_KEY_ID:
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        required: false
+      AWS_ROLE_ARN:
+        required: false
+      INFRACOST_API_KEY:
+        required: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  plan:
+    if: ${{ inputs.mode == 'plan' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.tf-version }}
+          terraform_wrapper: true
+
+      - name: Configure AWS credentials
+        if: ${{ secrets.AWS_ROLE_ARN != '' || secrets.AWS_ACCESS_KEY_ID != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.aws-region }}
+
+      - name: Terraform fmt
+        id: fmt
+        run: terraform fmt -check -recursive
+        working-directory: ${{ inputs.working-dir }}
+        continue-on-error: true
+
+      - name: Terraform init
+        id: init
+        run: terraform init -input=false
+        working-directory: ${{ inputs.working-dir }}
+
+      - name: Terraform validate
+        id: validate
+        run: terraform validate -no-color
+        working-directory: ${{ inputs.working-dir }}
+
+      - name: Terraform plan
+        id: plan
+        run: terraform plan -no-color -input=false -out=tfplan
+        working-directory: ${{ inputs.working-dir }}
+        continue-on-error: true
+
+      - name: Comment PR with plan
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const plan = `${{ steps.plan.outputs.stdout }}`.slice(0, 60000);
+            const body = `### Terraform Plan 📋
+            | Step | Status |
+            |------|--------|
+            | Format | \`${{ steps.fmt.outcome }}\` |
+            | Init | \`${{ steps.init.outcome }}\` |
+            | Validate | \`${{ steps.validate.outcome }}\` |
+            | Plan | \`${{ steps.plan.outcome }}\` |
+
+            <details><summary>Show Plan</summary>
+
+            \`\`\`terraform
+            ${plan}
+            \`\`\`
+
+            </details>
+
+            *Pushed by @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const existing = comments.find(c => c.body.includes('Terraform Plan 📋'));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Plan status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+
+  checkov:
+    if: ${{ inputs.run-checkov && inputs.mode == 'plan' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: ${{ inputs.working-dir }}
+          framework: terraform
+          quiet: true
+          soft_fail: true
+          output_format: github_failed_only
+
+  cost:
+    if: ${{ inputs.run-cost && inputs.mode == 'plan' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Infracost
+        uses: infracost/actions/setup@v3
+        with:
+          api-key: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Generate cost estimate
+        run: |
+          infracost breakdown --path=${{ inputs.working-dir }} --format=table
+
+  drift:
+    if: ${{ inputs.mode == 'drift' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ inputs.tf-version }}
+
+      - name: Configure AWS credentials
+        if: ${{ secrets.AWS_ROLE_ARN != '' || secrets.AWS_ACCESS_KEY_ID != '' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.aws-region }}
+
+      - name: Terraform init
+        run: terraform init -input=false
+        working-directory: ${{ inputs.working-dir }}
+
+      - name: Detect drift
+        id: drift
+        run: |
+          terraform plan -no-color -input=false -detailed-exitcode 2>&1 | tee plan_output.txt
+          EXIT_CODE=${PIPESTATUS[0]}
+          if [ $EXIT_CODE -eq 2 ]; then
+            echo "drift=true" >> $GITHUB_OUTPUT
+            echo "::warning::Infrastructure drift detected!"
+          elif [ $EXIT_CODE -eq 0 ]; then
+            echo "drift=false" >> $GITHUB_OUTPUT
+            echo "No drift detected."
+          else
+            exit $EXIT_CODE
+          fi
+        working-directory: ${{ inputs.working-dir }}
+
+      - name: Create issue on drift
+        if: steps.drift.outputs.drift == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('${{ inputs.working-dir }}/plan_output.txt', 'utf8').slice(0, 60000);
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 Terraform drift detected',
+              body: `Infrastructure drift detected in \`${{ inputs.working-dir }}\`.\n\n<details><summary>Drift details</summary>\n\n\`\`\`\n${plan}\n\`\`\`\n\n</details>`,
+              labels: ['infrastructure', 'drift'],
+            });

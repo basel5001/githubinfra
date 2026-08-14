@@ -1,0 +1,168 @@
+name: CI - Node.js
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        description: Node.js version to use
+        required: false
+        type: string
+        default: "20"
+      node-versions:
+        description: "JSON array for matrix testing (overrides node-version)"
+        required: false
+        type: string
+        default: ""
+      working-dir:
+        description: Working directory
+        required: false
+        type: string
+        default: "."
+      run-lint:
+        description: Run linting
+        required: false
+        type: boolean
+        default: true
+      run-test:
+        description: Run tests
+        required: false
+        type: boolean
+        default: true
+      run-build:
+        description: Run build
+        required: false
+        type: boolean
+        default: true
+      run-type-check:
+        description: Run tsc --noEmit
+        required: false
+        type: boolean
+        default: false
+      package-manager:
+        description: "Package manager: npm, yarn, pnpm"
+        required: false
+        type: string
+        default: npm
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    if: ${{ inputs.run-lint }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: ${{ inputs.package-manager }}
+          cache-dependency-path: ${{ inputs.working-dir }}/package-lock.json
+
+      - name: Install
+        working-directory: ${{ inputs.working-dir }}
+        run: |
+          case "${{ inputs.package-manager }}" in
+            pnpm) corepack enable && pnpm install --frozen-lockfile ;;
+            yarn) corepack enable && yarn install --immutable ;;
+            *)    npm ci ;;
+          esac
+
+      - name: Lint
+        working-directory: ${{ inputs.working-dir }}
+        run: |
+          case "${{ inputs.package-manager }}" in
+            pnpm) pnpm lint ;;
+            yarn) yarn lint ;;
+            *)    npm run lint ;;
+          esac
+
+  type-check:
+    if: ${{ inputs.run-type-check }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: ${{ inputs.package-manager }}
+          cache-dependency-path: ${{ inputs.working-dir }}/package-lock.json
+
+      - name: Install
+        working-directory: ${{ inputs.working-dir }}
+        run: |
+          case "${{ inputs.package-manager }}" in
+            pnpm) corepack enable && pnpm install --frozen-lockfile ;;
+            yarn) corepack enable && yarn install --immutable ;;
+            *)    npm ci ;;
+          esac
+
+      - name: Type check
+        working-directory: ${{ inputs.working-dir }}
+        run: npx tsc --noEmit
+
+  test:
+    if: ${{ inputs.run-test }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ${{ inputs.node-versions != '' && fromJSON(inputs.node-versions) || fromJSON(format('["{0}"]', inputs.node-version)) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: ${{ inputs.package-manager }}
+          cache-dependency-path: ${{ inputs.working-dir }}/package-lock.json
+
+      - name: Install
+        working-directory: ${{ inputs.working-dir }}
+        run: |
+          case "${{ inputs.package-manager }}" in
+            pnpm) corepack enable && pnpm install --frozen-lockfile ;;
+            yarn) corepack enable && yarn install --immutable ;;
+            *)    npm ci ;;
+          esac
+
+      - name: Test
+        working-directory: ${{ inputs.working-dir }}
+        run: |
+          case "${{ inputs.package-manager }}" in
+            pnpm) pnpm test -- --passWithNoTests ;;
+            yarn) yarn test --passWithNoTests ;;
+            *)    npm test -- --passWithNoTests ;;
+          esac
+
+  build:
+    if: ${{ inputs.run-build }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: ${{ inputs.package-manager }}
+          cache-dependency-path: ${{ inputs.working-dir }}/package-lock.json
+
+      - name: Install
+        working-directory: ${{ inputs.working-dir }}
+        run: |
+          case "${{ inputs.package-manager }}" in
+            pnpm) corepack enable && pnpm install --frozen-lockfile ;;
+            yarn) corepack enable && yarn install --immutable ;;
+            *)    npm ci ;;
+          esac
+
+      - name: Build
+        working-directory: ${{ inputs.working-dir }}
+        run: |
+          case "${{ inputs.package-manager }}" in
+            pnpm) pnpm build ;;
+            yarn) yarn build ;;
+            *)    npm run build ;;
+          esac

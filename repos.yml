@@ -30,7 +30,7 @@ repos:
   cloud-platform:
     description: "Internal Developer Platform with AI-powered infrastructure provisioning (AWS Bedrock + Terraform)"
     topics: [developer-platform, idp, fastapi, terraform, aws-bedrock, self-service, infrastructure, platform-engineering]
-    workflows: [security.yml, renovate.yml, ci-python.yml]
+    workflows: [security.yml, renovate.yml, ci-python.yml, terraform-plan.yml]
 
   devsecops-pipeline:
     description: "Complete DevSecOps scanning platform: SAST, SCA, IaC, secrets + AI risk analysis (AWS Bedrock)"
@@ -45,12 +45,12 @@ repos:
   disaster-recovery-aws:
     description: "Automated AWS disaster recovery: cross-region failover, DR drills, AI runbook generation"
     topics: [disaster-recovery, aws, terraform, lambda, cross-region, failover, sre, aws-bedrock]
-    workflows: [security.yml, renovate.yml, terraform-validate.yml]
+    workflows: [security.yml, renovate.yml, terraform-validate.yml, terraform-plan.yml]
 
   gitops-cluster:
     description: "Full GitOps platform: ArgoCD + Crossplane + Kyverno + Argo Rollouts, multi-env promotion"
     topics: [gitops, argocd, crossplane, kyverno, argo-rollouts, kubernetes, progressive-delivery, platform-engineering]
-    workflows: [security.yml, renovate.yml]
+    workflows: [security.yml, renovate.yml, k8s-validate.yml]
 
   chaos-engineering:
     description: "Kubernetes chaos engineering toolkit with AI analysis (AWS Bedrock): pod kill, network latency, CPU stress"
@@ -60,17 +60,17 @@ repos:
   secret-vault:
     description: "HashiCorp Vault deployment as code: auto-unseal, secret rotation, K8s CSI integration"
     topics: [hashicorp-vault, secrets-management, terraform, aws-kms, kubernetes, security, auto-rotation]
-    workflows: [security.yml, renovate.yml, terraform-validate.yml]
+    workflows: [security.yml, renovate.yml, terraform-validate.yml, terraform-plan.yml]
 
   multi-cloud-landing-zone:
     description: "AWS Organization bootstrapper: SCPs, SSO, GuardDuty, Security Hub, account vending — all Terraform"
     topics: [aws-landing-zone, aws-organizations, terraform, scp, sso, guardduty, security-hub, governance]
-    workflows: [security.yml, renovate.yml, terraform-validate.yml]
+    workflows: [security.yml, renovate.yml, terraform-validate.yml, terraform-plan.yml]
 
   terraform-aws-modules:
     description: "Reusable Terraform modules for AWS (VPC, EKS, Lambda, S3)"
     topics: [terraform, aws, modules, vpc, eks, lambda, s3, infrastructure-as-code]
-    workflows: [security.yml, renovate.yml, terraform-validate.yml]
+    workflows: [security.yml, renovate.yml, terraform-validate.yml, terraform-plan.yml]
 
   aws-cost-optimizer:
     description: "AWS Lambda cost anomaly detection with Slack alerts"
@@ -80,7 +80,7 @@ repos:
   container-security-scanner:
     description: "GitHub Action for container vulnerability scanning (Trivy + Grype + Syft SBOM)"
     topics: [github-action, container-security, trivy, grype, syft, sbom, vulnerability-scanning, devsecops]
-    workflows: [security.yml, renovate.yml]
+    workflows: [security.yml, renovate.yml, release.yml]
 
   devops-dashboard:
     description: "DORA metrics dashboard - deployment frequency, lead time, MTTR, change failure rate"
@@ -95,12 +95,12 @@ repos:
   aws-vpn-provisioner:
     description: "Terraform-based AWS VPN deployment for OpenVPN and WireGuard."
     topics: [terraform, aws, vpn, openvpn, wireguard, infrastructure]
-    workflows: [security.yml, renovate.yml, terraform-validate.yml]
+    workflows: [security.yml, renovate.yml, terraform-validate.yml, terraform-plan.yml]
 
   study-buddy-ai:
     description: "React frontend for generating quizzes from study material with an external AI backend."
     topics: [ai, amazon-bedrock, education, quiz, react]
-    workflows: [security.yml, renovate.yml]
+    workflows: [security.yml, renovate.yml, ci-node.yml]
 
   debtless:
     description: "Copilot-powered automatic code and technical debt gatekeeper"
@@ -121,7 +121,7 @@ repos:
   udapeople-cicd:
     description: "Full-stack CI/CD project with TypeScript backend and React frontend"
     topics: [cicd, devops, full-stack, nodejs, typescript]
-    workflows: [security.yml, renovate.yml]
+    workflows: [security.yml, renovate.yml, ci-node.yml]
 
   Bash-Scripting:
     description: "Interactive bash script for managing Linux users and groups"
@@ -140,3 +140,23 @@ repos:
     topics: [automation, aws, boto3, python, scripts]
     visibility: private
     workflows: [security.yml, renovate.yml, ci-python.yml]
+
+  k8s-security-bench:
+    description: "Kubernetes security benchmarking tool written in Go"
+    topics: [kubernetes, security, go, cis-benchmark]
+    workflows: [security.yml, renovate.yml, ci-go.yml, k8s-validate.yml]
+
+  mcp-devops-server:
+    description: "Model Context Protocol server for DevOps tooling"
+    topics: [mcp, devops, typescript, model-context-protocol]
+    workflows: [security.yml, renovate.yml, ci-node.yml]
+
+  homelab-gitops:
+    description: "GitOps-managed homelab Kubernetes cluster"
+    topics: [gitops, kubernetes, homelab, kustomize]
+    workflows: [security.yml, renovate.yml, k8s-validate.yml]
+
+  homelab-ansible:
+    description: "Ansible playbooks for homelab infrastructure"
+    topics: [ansible, homelab, infrastructure, automation]
+    workflows: [security.yml, renovate.yml]

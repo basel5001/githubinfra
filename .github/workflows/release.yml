@@ -1,0 +1,225 @@
+name: Release
+
+on:
+  workflow_call:
+    inputs:
+      release-type:
+        description: "Type: auto (from commits), manual (from tag)"
+        required: false
+        type: string
+        default: auto
+      build-command:
+        description: Build command before release
+        required: false
+        type: string
+        default: ""
+      publish-docker:
+        description: Publish Docker image to GHCR
+        required: false
+        type: boolean
+        default: false
+      publish-pypi:
+        description: Publish to PyPI
+        required: false
+        type: boolean
+        default: false
+      publish-npm:
+        description: Publish to npm
+        required: false
+        type: boolean
+        default: false
+      docker-image-name:
+        description: Docker image name (for publish-docker)
+        required: false
+        type: string
+        default: ""
+      working-dir:
+        description: Working directory
+        required: false
+        type: string
+        default: "."
+      generate-notes:
+        description: Auto-generate release notes from commits
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      NPM_TOKEN:
+        required: false
+      PYPI_TOKEN:
+        required: false
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+      created: ${{ steps.version.outputs.created }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ inputs.release-type }}" == "auto" ]; then
+            LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            MAJOR=$(echo $LATEST | sed 's/v//' | cut -d. -f1)
+            MINOR=$(echo $LATEST | sed 's/v//' | cut -d. -f2)
+            PATCH=$(echo $LATEST | sed 's/v//' | cut -d. -f3)
+
+            # Check commit messages since last tag for bump type
+            COMMITS=$(git log ${LATEST}..HEAD --pretty=format:"%s" 2>/dev/null || git log --pretty=format:"%s")
+            if echo "$COMMITS" | grep -qiE "^(feat|feature)(\(.+\))?!:|BREAKING CHANGE"; then
+              MAJOR=$((MAJOR + 1)); MINOR=0; PATCH=0
+            elif echo "$COMMITS" | grep -qiE "^feat(\(.+\))?:"; then
+              MINOR=$((MINOR + 1)); PATCH=0
+            else
+              PATCH=$((PATCH + 1))
+            fi
+
+            VERSION="${MAJOR}.${MINOR}.${PATCH}"
+            TAG="v${VERSION}"
+
+            # Skip if no new commits
+            if [ "$TAG" == "$LATEST" ]; then
+              echo "No new commits since $LATEST"
+              echo "created=false" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+          else
+            TAG="${GITHUB_REF_NAME}"
+            VERSION="${TAG#v}"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "created=true" >> $GITHUB_OUTPUT
+
+      - name: Generate changelog
+        if: steps.version.outputs.created == 'true'
+        id: changelog
+        run: |
+          LATEST=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -n "$LATEST" ]; then
+            RANGE="${LATEST}..HEAD"
+          else
+            RANGE="HEAD"
+          fi
+
+          {
+            echo "## What's Changed"
+            echo ""
+
+            # Group by type
+            for type_label in "feat:🚀 Features" "fix:🐛 Bug Fixes" "docs:📚 Documentation" "chore:🔧 Maintenance" "ci:⚙️ CI/CD" "refactor:♻️ Refactoring" "perf:⚡ Performance" "test:🧪 Tests"; do
+              TYPE=$(echo "$type_label" | cut -d: -f1)
+              LABEL=$(echo "$type_label" | cut -d: -f2-)
+              ITEMS=$(git log $RANGE --pretty=format:"- %s (%h)" --grep="^${TYPE}" 2>/dev/null || true)
+              if [ -n "$ITEMS" ]; then
+                echo "### $LABEL"
+                echo "$ITEMS"
+                echo ""
+              fi
+            done
+
+            # Uncategorized
+            MISC=$(git log $RANGE --pretty=format:"%s (%h)" | grep -vE "^(feat|fix|docs|chore|ci|refactor|perf|test)" | sed 's/^/- /' || true)
+            if [ -n "$MISC" ]; then
+              echo "### 📦 Other"
+              echo "$MISC"
+              echo ""
+            fi
+          } > changelog.md
+
+          cat changelog.md
+
+      - name: Create GitHub Release
+        if: steps.version.outputs.created == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          body_path: changelog.md
+          generate_release_notes: ${{ inputs.generate-notes }}
+          draft: false
+          prerelease: false
+
+  publish-docker:
+    if: ${{ inputs.publish-docker && needs.release.outputs.created == 'true' }}
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.working-dir }}
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ inputs.docker-image-name || github.event.repository.name }}:${{ needs.release.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/${{ inputs.docker-image-name || github.event.repository.name }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  publish-pypi:
+    if: ${{ inputs.publish-pypi && needs.release.outputs.created == 'true' }}
+    needs: release
+    runs-on: ubuntu-latest
+    environment: pypi
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build & publish
+        working-directory: ${{ inputs.working-dir }}
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+        run: |
+          pip install build twine
+          python -m build
+          twine upload dist/*
+
+  publish-npm:
+    if: ${{ inputs.publish-npm && needs.release.outputs.created == 'true' }}
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Build & publish
+        working-directory: ${{ inputs.working-dir }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          npm ci
+          if [ -n "${{ inputs.build-command }}" ]; then
+            ${{ inputs.build-command }}
+          fi
+          npm publish --access public
