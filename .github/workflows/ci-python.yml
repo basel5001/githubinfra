@@ -125,13 +125,17 @@ jobs:
 
       - name: Run tests
         working-directory: ${{ inputs.working-dir }}
+        env:
+          TEST_COMMAND: ${{ inputs.test-command }}
+          COVERAGE_THRESHOLD: ${{ inputs.coverage-threshold }}
+          UPLOAD_COVERAGE: ${{ inputs.upload-coverage }}
         run: |
-          if [ -n "${{ inputs.test-command }}" ]; then
-            ${{ inputs.test-command }}
+          if [ -n "$TEST_COMMAND" ]; then
+            eval "$TEST_COMMAND"
           else
             ARGS="--tb=short -q"
-            if [ "${{ inputs.coverage-threshold }}" != "0" ] || [ "${{ inputs.upload-coverage }}" == "true" ]; then
-              ARGS="$ARGS --cov --cov-report=xml --cov-report=term --cov-fail-under=${{ inputs.coverage-threshold }}"
+            if [ "$COVERAGE_THRESHOLD" != "0" ] || [ "$UPLOAD_COVERAGE" = "true" ]; then
+              ARGS="$ARGS --cov --cov-report=xml --cov-report=term --cov-fail-under=$COVERAGE_THRESHOLD"
             fi
             python -m pytest $ARGS
           fi
