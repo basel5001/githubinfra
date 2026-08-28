@@ -1,9 +1,0 @@
-name: ZZ Test Caller
-on:
-  workflow_dispatch:
-permissions:
-  contents: write
-  pull-requests: write
-jobs:
-  a:
-    uses: basel5001/githubinfra/.github/workflows/zz-test-callee.yml@main
