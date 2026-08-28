@@ -48,13 +48,17 @@ jobs:
           severity: CRITICAL,HIGH
           exit-code: ${{ inputs.fail-on-critical && '1' || '0' }}
       - name: Upload Trivy results
+        # Code scanning needs a public repo or GitHub Advanced Security
+        if: ${{ github.event.repository.visibility == 'public' }}
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
           category: trivy
 
   sast-scan:
-    if: inputs.scan-sast
+    # CodeQL reports only through code scanning, so it cannot work on a
+    # private repo without GitHub Advanced Security
+    if: ${{ inputs.scan-sast && github.event.repository.visibility == 'public' }}
     runs-on: ubuntu-latest
     permissions:
       actions: read
@@ -81,3 +85,4 @@ jobs:
         --recursive
         ./
       fail-on-vuln: ${{ inputs.fail-on-critical }}
+      upload-sarif: ${{ github.event.repository.visibility == 'public' }}
