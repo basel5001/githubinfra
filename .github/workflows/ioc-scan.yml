@@ -32,6 +32,10 @@ jobs:
   dependency-scan:
     if: inputs.scan-dependency
     runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
     steps:
       - uses: actions/checkout@v4
       - name: Run Trivy dependency scan
@@ -53,6 +57,8 @@ jobs:
     if: inputs.scan-sast
     runs-on: ubuntu-latest
     permissions:
+      actions: read
+      contents: read
       security-events: write
     steps:
       - uses: actions/checkout@v4
@@ -65,12 +71,13 @@ jobs:
 
   osv-scanner:
     if: inputs.scan-dependency
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Run OSV Scanner
-        uses: google/osv-scanner-action@v1
-        with:
-          scan-args: |-
-            --recursive
-            ./
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@v2.5.1
+    with:
+      scan-args: |-
+        --recursive
+        ./
+      fail-on-vuln: ${{ inputs.fail-on-critical }}
