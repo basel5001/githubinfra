@@ -1,0 +1,13 @@
+name: ZZ Test Callee
+on:
+  workflow_call:
+    inputs:
+      min-age-days:
+        required: false
+        type: number
+        default: 7
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "val=${{ inputs.min-age-days }}"
