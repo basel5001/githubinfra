@@ -217,9 +217,10 @@ jobs:
         working-directory: ${{ inputs.working-dir }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          BUILD_COMMAND: ${{ inputs.build-command }}
         run: |
           npm ci
-          if [ -n "${{ inputs.build-command }}" ]; then
-            ${{ inputs.build-command }}
+          if [ -n "$BUILD_COMMAND" ]; then
+            eval "$BUILD_COMMAND"
           fi
           npm publish --access public

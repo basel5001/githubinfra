@@ -84,11 +84,14 @@ jobs:
         run: go mod download
 
       - name: Run lint
+        env:
+          LINT_COMMAND: ${{ inputs.lint-command }}
+          LANGUAGE: ${{ inputs.language }}
         run: |
-          if [ -n "${{ inputs.lint-command }}" ]; then
-            ${{ inputs.lint-command }}
+          if [ -n "$LINT_COMMAND" ]; then
+            eval "$LINT_COMMAND"
           else
-            case "${{ inputs.language }}" in
+            case "$LANGUAGE" in
               python) ruff check . ;;
               node) npm run lint ;;
               go) go vet ./... ;;
@@ -135,11 +138,14 @@ jobs:
         run: go mod download
 
       - name: Run tests
+        env:
+          TEST_COMMAND: ${{ inputs.test-command }}
+          LANGUAGE: ${{ inputs.language }}
         run: |
-          if [ -n "${{ inputs.test-command }}" ]; then
-            ${{ inputs.test-command }}
+          if [ -n "$TEST_COMMAND" ]; then
+            eval "$TEST_COMMAND"
           else
-            case "${{ inputs.language }}" in
+            case "$LANGUAGE" in
               python) python -m pytest ;;
               node) npm test ;;
               go) go test ./... ;;
