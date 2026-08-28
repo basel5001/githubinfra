@@ -130,8 +130,15 @@ jobs:
 
       - name: Test
         working-directory: ${{ inputs.working-dir }}
+        env:
+          PKG_MANAGER: ${{ inputs.package-manager }}
         run: |
-          case "${{ inputs.package-manager }}" in
+          set -euo pipefail
+          if ! node -e 'process.exitCode = (require("./package.json").scripts || {}).test ? 0 : 1'; then
+            echo "::notice::No test script defined in package.json, skipping test job"
+            exit 0
+          fi
+          case "$PKG_MANAGER" in
             pnpm) pnpm test -- --passWithNoTests ;;
             yarn) yarn test --passWithNoTests ;;
             *)    npm test -- --passWithNoTests ;;
