@@ -76,7 +76,9 @@ jobs:
 
       - name: Install kubeconform
         run: |
-          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          set -euo pipefail
+          curl -fsSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz \
+            | tar xz kubeconform
           sudo mv kubeconform /usr/local/bin/
 
       - name: Validate manifests
@@ -136,8 +138,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Pluto
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          curl -sSL https://github.com/FairwindsOps/pluto/releases/latest/download/pluto_linux_amd64.tar.gz | tar xz
+          set -euo pipefail
+          TAG="$(gh api repos/FairwindsOps/pluto/releases/latest --jq .tag_name)"
+          curl -fsSL "https://github.com/FairwindsOps/pluto/releases/download/${TAG}/pluto_${TAG#v}_linux_amd64.tar.gz" \
+            | tar xz pluto
           sudo mv pluto /usr/local/bin/
 
       - name: Check deprecated APIs
@@ -153,8 +160,13 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Kyverno CLI
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          curl -sSL https://github.com/kyverno/kyverno/releases/latest/download/kyverno-cli_linux_x86_64.tar.gz | tar xz
+          set -euo pipefail
+          TAG="$(gh api repos/kyverno/kyverno/releases/latest --jq .tag_name)"
+          curl -fsSL "https://github.com/kyverno/kyverno/releases/download/${TAG}/kyverno-cli_${TAG}_linux_x86_64.tar.gz" \
+            | tar xz kyverno
           sudo mv kyverno /usr/local/bin/
 
       - name: Run Kyverno tests
