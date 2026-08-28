@@ -6,6 +6,9 @@ on:
         required: false
         type: number
         default: 7
+permissions:
+  contents: write
+  pull-requests: write
 jobs:
   t:
     runs-on: ubuntu-latest
