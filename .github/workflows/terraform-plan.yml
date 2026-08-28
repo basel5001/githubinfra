@@ -52,6 +52,8 @@ jobs:
   plan:
     if: ${{ inputs.mode == 'plan' }}
     runs-on: ubuntu-latest
+    env:
+      HAS_AWS_CREDS: ${{ secrets.AWS_ROLE_ARN != '' || secrets.AWS_ACCESS_KEY_ID != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -61,7 +63,7 @@ jobs:
           terraform_wrapper: true
 
       - name: Configure AWS credentials
-        if: ${{ secrets.AWS_ROLE_ARN != '' || secrets.AWS_ACCESS_KEY_ID != '' }}
+        if: env.HAS_AWS_CREDS == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -174,6 +176,8 @@ jobs:
   drift:
     if: ${{ inputs.mode == 'drift' }}
     runs-on: ubuntu-latest
+    env:
+      HAS_AWS_CREDS: ${{ secrets.AWS_ROLE_ARN != '' || secrets.AWS_ACCESS_KEY_ID != '' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -182,7 +186,7 @@ jobs:
           terraform_version: ${{ inputs.tf-version }}
 
       - name: Configure AWS credentials
-        if: ${{ secrets.AWS_ROLE_ARN != '' || secrets.AWS_ACCESS_KEY_ID != '' }}
+        if: env.HAS_AWS_CREDS == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
