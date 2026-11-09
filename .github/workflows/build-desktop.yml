@@ -35,6 +35,14 @@ on:
         required: false
         type: string
         default: "22"
+      linux-runner:
+        description: >-
+          Linux runner image. Pinned to 24.04 because on ubuntu-latest (26.04)
+          electron-builder's bundled fpm fails in rpmbuild without printing the
+          rpmbuild error.
+        required: false
+        type: string
+        default: "ubuntu-24.04"
       install-command:
         description: Dependency install command
         required: false
@@ -109,7 +117,7 @@ jobs:
             os: windows-latest
             target: win
           - name: Linux (x64)
-            os: ubuntu-latest
+            os: ${{ inputs.linux-runner }}
             target: linux
           - name: macOS (x64 + arm64)
             os: macos-latest
@@ -158,6 +166,7 @@ jobs:
         env:
           # electron-builder only signs when a certificate is supplied, so the
           # default unsigned build has to disable identity auto-discovery.
+          SIGN: ${{ inputs.sign }}
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ inputs.sign && 'true' || 'false' }}
           CSC_LINK: ${{ inputs.sign && secrets.CSC_LINK || '' }}
           CSC_KEY_PASSWORD: ${{ inputs.sign && secrets.CSC_KEY_PASSWORD || '' }}
@@ -168,6 +177,15 @@ jobs:
           TARGET: ${{ matrix.target }}
         run: |
           set -euo pipefail
+          # An empty CSC_LINK is still "defined" to electron-builder and makes
+          # macOS signing fail with "<project dir> not a file", so remove the
+          # signing variables entirely when unsigned.
+          if [ "$SIGN" != "true" ]; then
+            unset CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD APPLE_TEAM_ID
+          elif [ -z "${CSC_LINK:-}" ]; then
+            echo "::error::sign=true but the CSC_LINK secret is not set"
+            exit 1
+          fi
           cmd=$(printf '%s' "$PACKAGE_COMMAND" | sed "s/{target}/$TARGET/g")
           echo "+ $cmd"
           eval "$cmd"
