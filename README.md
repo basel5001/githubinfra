@@ -28,6 +28,8 @@ jobs:
 | `docker-build-publish.yml` | Build and push Docker images to GHCR/DockerHub |
 | `terraform-validate.yml` | Terraform fmt/init/validate + tfsec security scan |
 | `sbom-generate.yml` | Generate SBOM using Anchore Syft |
+| `release.yml` | Tag-driven release with optional Docker/PyPI/npm publishing |
+| `build-desktop.yml` | Native 3-OS Electron packaging (exe/dmg/AppImage/deb/rpm) + smoke test + release |
 | `stale-management.yml` | Stale issue and PR management |
 | `release-notify.yml` | Release notifications to Discord/Slack |
 | `branch-copy.yml` | Copy repo content to multiple branches |

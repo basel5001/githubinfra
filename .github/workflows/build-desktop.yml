@@ -1,0 +1,236 @@
+name: Build desktop installers
+
+# Reusable 3-OS packaging pipeline for Electron desktop apps.
+#
+# Caller:
+#   jobs:
+#     installers:
+#       permissions:
+#         contents: write     # required for the release step
+#       uses: basel5001/githubinfra/.github/workflows/build-desktop.yml@main
+#       with:
+#         product: myapp
+#         test-command: npm run test:scan
+#         smoke-command: node scripts/smoke-packaged.mjs
+#       secrets: inherit
+#
+# Everything runs on the native OS runner: NSIS/portable on Windows, dmg/zip on
+# macOS (x64 + arm64), AppImage/deb/rpm/tar.gz on Linux. No cross-building.
+
+on:
+  workflow_call:
+    inputs:
+      product:
+        description: Executable/bundle name; defaults to the repository name
+        required: false
+        type: string
+        default: ""
+      working-dir:
+        description: Directory containing package.json
+        required: false
+        type: string
+        default: "."
+      node-version:
+        description: Node.js version
+        required: false
+        type: string
+        default: "22"
+      install-command:
+        description: Dependency install command
+        required: false
+        type: string
+        default: "npm ci"
+      typecheck-command:
+        description: Typecheck command; empty disables the step
+        required: false
+        type: string
+        default: "npm run typecheck"
+      test-command:
+        description: Test command; empty disables the step
+        required: false
+        type: string
+        default: ""
+      build-command:
+        description: Compile/bundle command run before packaging; empty disables the step
+        required: false
+        type: string
+        default: "npm run build"
+      package-command:
+        description: >-
+          Packaging command. {target} is replaced with win, linux or mac.
+          Set to your Tauri/other packager if not using electron-builder.
+        required: false
+        type: string
+        default: "npx electron-builder --{target} --publish never"
+      smoke-command:
+        description: Launches the packaged app; empty disables the smoke test
+        required: false
+        type: string
+        default: ""
+      sign:
+        description: Enable code signing (requires CSC_LINK/CSC_KEY_PASSWORD secrets)
+        required: false
+        type: boolean
+        default: false
+      draft-release:
+        description: Create the GitHub release as a draft
+        required: false
+        type: boolean
+        default: true
+    secrets:
+      CSC_LINK:
+        description: Base64 code-signing certificate (Windows and macOS)
+        required: false
+      CSC_KEY_PASSWORD:
+        description: Password for CSC_LINK
+        required: false
+      APPLE_ID:
+        description: Apple ID for notarisation
+        required: false
+      APPLE_APP_SPECIFIC_PASSWORD:
+        description: App-specific password for notarisation
+        required: false
+      APPLE_TEAM_ID:
+        description: Apple team ID for notarisation
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows (x64)
+            os: windows-latest
+            target: win
+          - name: Linux (x64)
+            os: ubuntu-latest
+            target: linux
+          - name: macOS (x64 + arm64)
+            os: macos-latest
+            target: mac
+
+    env:
+      DIST: ${{ inputs.working-dir == '.' && 'dist' || format('{0}/dist', inputs.working-dir) }}
+      PRODUCT: ${{ inputs.product != '' && inputs.product || github.event.repository.name }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.working-dir }}/package-lock.json
+
+      - name: Install dependencies
+        if: inputs.install-command != ''
+        working-directory: ${{ inputs.working-dir }}
+        run: ${{ inputs.install-command }}
+
+      - name: Typecheck
+        if: inputs.typecheck-command != ''
+        working-directory: ${{ inputs.working-dir }}
+        run: ${{ inputs.typecheck-command }}
+
+      - name: Tests
+        if: inputs.test-command != ''
+        working-directory: ${{ inputs.working-dir }}
+        run: ${{ inputs.test-command }}
+
+      - name: Install rpm tooling
+        if: matrix.target == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Build
+        if: inputs.build-command != ''
+        working-directory: ${{ inputs.working-dir }}
+        run: ${{ inputs.build-command }}
+
+      - name: Package
+        shell: bash
+        working-directory: ${{ inputs.working-dir }}
+        env:
+          # electron-builder only signs when a certificate is supplied, so the
+          # default unsigned build has to disable identity auto-discovery.
+          CSC_IDENTITY_AUTO_DISCOVERY: ${{ inputs.sign && 'true' || 'false' }}
+          CSC_LINK: ${{ inputs.sign && secrets.CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ inputs.sign && secrets.CSC_KEY_PASSWORD || '' }}
+          APPLE_ID: ${{ inputs.sign && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ inputs.sign && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ inputs.sign && secrets.APPLE_TEAM_ID || '' }}
+          PACKAGE_COMMAND: ${{ inputs.package-command }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          cmd=$(printf '%s' "$PACKAGE_COMMAND" | sed "s/{target}/$TARGET/g")
+          echo "+ $cmd"
+          eval "$cmd"
+
+      - name: Smoke test packaged app
+        if: inputs.smoke-command != ''
+        shell: bash
+        working-directory: ${{ inputs.working-dir }}
+        env:
+          SMOKE_COMMAND: ${{ inputs.smoke-command }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          # Ubuntu runners have no usable SUID sandbox helper for unpacked
+          # builds, so the smoke script passes --no-sandbox there.
+          set -euo pipefail
+          if [ "$TARGET" = "linux" ]; then
+            xvfb-run -a bash -c "$SMOKE_COMMAND"
+          else
+            bash -c "$SMOKE_COMMAND"
+          fi
+
+      - name: Collect installers
+        id: collect
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          case "$TARGET" in
+            win)   globs=$(printf '%s\n' "$DIST"/*.exe) ;;
+            linux) globs=$(printf '%s\n' "$DIST"/*.AppImage "$DIST"/*.deb "$DIST"/*.rpm "$DIST"/*.tar.gz) ;;
+            mac)   globs=$(printf '%s\n' "$DIST"/*.dmg "$DIST"/*.zip) ;;
+            *)     echo "unknown target: $TARGET" >&2; exit 1 ;;
+          esac
+          echo "$globs"
+          {
+            echo "globs<<__GLOBS__"
+            echo "$globs"
+            echo "__GLOBS__"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.PRODUCT }}-${{ matrix.target }}
+          path: ${{ steps.collect.outputs.globs }}
+          if-no-files-found: error
+
+  # One release job instead of one per runner: three concurrent jobs creating
+  # the same draft release race and fail intermittently.
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download installers
+        uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release/*
+          draft: ${{ inputs.draft-release }}
