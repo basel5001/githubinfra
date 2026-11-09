@@ -166,4 +166,5 @@ repos:
   windupe:
     description: "Read-only duplicate file and folder explorer for Windows, macOS and Linux"
     topics: [duplicate-files, dedupe, disk-space, electron, typescript, cross-platform, desktop-app]
+    visibility: private
     workflows: [security.yml, renovate.yml, build-desktop.yml]
