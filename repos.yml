@@ -162,3 +162,8 @@ repos:
     description: "Ansible playbooks for homelab infrastructure"
     topics: [ansible, homelab, infrastructure, automation]
     workflows: [security.yml, renovate.yml]
+
+  windupe:
+    description: "Read-only duplicate file and folder explorer for Windows, macOS and Linux"
+    topics: [duplicate-files, dedupe, disk-space, electron, typescript, cross-platform, desktop-app]
+    workflows: [security.yml, renovate.yml, build-desktop.yml]
